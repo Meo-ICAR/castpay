@@ -24,19 +24,21 @@ class CastingItalianSeeder extends Seeder
         $bgRole = Role::where('slug', 'backgrounder')->first();
 
         // 2. Creazione Compagnia di Casting
-        $company = Company::create([
-            'name' => 'Cinecittà Casting Pro',
-            'slug' => 'cinecitta-casting-pro',
-        ]);
+        $company = Company::firstOrCreate(
+            ['slug' => 'cinecitta-casting-pro'],
+            ['name' => 'Cinecittà Casting Pro']
+        );
 
         // 3. Utente Admin
-        $admin = User::create([
-            'name' => 'Amministratore Casting',
-            'email' => 'admin@cinecitta.it',
-            'password' => Hash::make('password'),
-            'company_id' => $company->id,
-        ]);
-        $admin->roles()->attach($adminRole);
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@cinecitta.it'],
+            [
+                'name' => 'Amministratore Casting',
+                'password' => Hash::make('password'),
+                'company_id' => $company->id,
+            ]
+        );
+        $admin->roles()->syncWithoutDetaching([$adminRole->id]);
 
         // 4. Servizi e Listini Prezzi (In Italiano)
         $services = [
@@ -76,23 +78,29 @@ class CastingItalianSeeder extends Seeder
         ];
 
         foreach ($services as $sData) {
-            $service = Service::create([
-                'company_id' => $company->id,
-                'name' => $sData['name'],
-                'description' => $sData['description'],
-                'required_role_id' => $sData['required_role_id'],
-                'is_active' => true,
-            ]);
+            $service = Service::firstOrCreate(
+                ['company_id' => $company->id, 'name' => $sData['name']],
+                [
+                    'description' => $sData['description'],
+                    'required_role_id' => $sData['required_role_id'],
+                    'is_active' => true,
+                ]
+            );
 
             foreach ($sData['prices'] as $pData) {
-                Price::create([
-                    'service_id' => $service->id,
-                    'name' => $pData['name'],
-                    'amount' => $pData['amount'],
-                    'currency' => 'eur',
-                    'type' => $pData['type'],
-                    'interval' => $pData['interval'] ?? null,
-                ]);
+                Price::firstOrCreate(
+                    [
+                        'company_id' => $company->id,
+                        'service_id' => $service->id,
+                        'name' => $pData['name'],
+                    ],
+                    [
+                        'amount' => $pData['amount'],
+                        'currency' => 'eur',
+                        'type' => $pData['type'],
+                        'interval' => $pData['interval'] ?? null,
+                    ]
+                );
             }
         }
     }

@@ -10,6 +10,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class PriceResource extends Resource
 {
@@ -22,7 +23,11 @@ class PriceResource extends Resource
         return $schema
             ->components([
                 Select::make('service_id')
-                    ->relationship('service', 'name')
+                    ->relationship(
+                        name: 'service',
+                        titleAttribute: 'name',
+                        modifyQueryUsing: fn (Builder $query) => $query->where('company_id', filament()->getTenant()->id),
+                    )
                     ->required(),
                 TextInput::make('name')->placeholder('Monthly, Yearly...'),
                 TextInput::make('amount')->numeric()->prefix('$')->required(),
@@ -41,6 +46,15 @@ class PriceResource extends Resource
                     ])->visible(fn ($get) => $get('type') === 'recurring'),
                 TextInput::make('stripe_price_id'),
             ]);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $user = auth()->user();
+        if ($user && $user->hasRole("superadmin")) {
+            return parent::getEloquentQuery()->withoutGlobalScopes();
+        }
+        return parent::getEloquentQuery();
     }
 
     public static function table(Table $table): Table

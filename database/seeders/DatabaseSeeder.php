@@ -15,11 +15,27 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call([
+            RoleSeeder::class,
+            CastingItalianSeeder::class,
+        ]);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $company = \App\Models\Company::firstOrCreate(
+            ['id' => 1],
+            ['name' => 'Hassisto', 'slug' => 'hassisto']
+        );
+
+        $superadmin = \App\Models\User::firstOrCreate(
+            ['email' => 'superadmin@hassisto.com'],
+            [
+                'name' => 'Super Admin',
+                'password' => \Illuminate\Support\Facades\Hash::make('password'),
+                'company_id' => $company->id,
+            ]
+        );
+
+        $superadmin->roles()->syncWithoutDetaching([
+            \App\Models\Role::where('slug', 'superadmin')->first()->id
         ]);
     }
 }

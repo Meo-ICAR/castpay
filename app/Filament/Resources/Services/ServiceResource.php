@@ -12,7 +12,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Tables\Actions\Action;
+use Filament\Actions\Action;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -68,9 +68,14 @@ class ServiceResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
+        $user = auth()->user();
+        
+        if ($user && $user->hasRole('superadmin')) {
+            return Service::query(); // Access all records globally
+        }
+
         $query = parent::getEloquentQuery();
         
-        $user = auth()->user();
         if ($user && !$user->hasRole('admin')) {
             $query->where(function ($q) use ($user) {
                 $q->whereNull('required_role_id')

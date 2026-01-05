@@ -10,7 +10,12 @@ class Price extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['service_id', 'name', 'amount', 'currency', 'stripe_price_id', 'type', 'interval'];
+    protected $fillable = ['company_id', 'service_id', 'name', 'amount', 'currency', 'stripe_price_id', 'type', 'interval'];
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     public function service(): BelongsTo
     {

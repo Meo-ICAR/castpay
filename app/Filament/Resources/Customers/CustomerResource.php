@@ -9,6 +9,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class CustomerResource extends Resource
 {
@@ -24,6 +25,15 @@ class CustomerResource extends Resource
                 TextInput::make('email')->email()->required(),
                 TextInput::make('stripe_id')->label('Stripe ID'),
             ]);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $user = auth()->user();
+        if ($user && $user->hasRole("superadmin")) {
+            return parent::getEloquentQuery()->withoutGlobalScopes();
+        }
+        return parent::getEloquentQuery();
     }
 
     public static function table(Table $table): Table

@@ -19,7 +19,6 @@ class MultiTenancyRoleTest extends TestCase
 
         $user = User::factory()->create([
             'company_id' => $company1->id,
-            'role' => 'admin',
         ]);
 
         $service1 = Service::factory()->create(['company_id' => $company1->id, 'name' => 'Company 1 Service']);
@@ -36,27 +35,31 @@ class MultiTenancyRoleTest extends TestCase
     {
         $company = Company::factory()->create();
 
-        $adminUser = User::factory()->create(['company_id' => $company->id, 'role' => 'admin']);
-        $memberUser = User::factory()->create(['company_id' => $company->id, 'role' => 'member']);
+        $adminRole = \App\Models\Role::create(['name' => 'Admin', 'slug' => 'admin', 'company_id' => $company->id]);
+        $memberRole = \App\Models\Role::create(['name' => 'Member', 'slug' => 'member', 'company_id' => $company->id]);
+
+        $adminUser = User::factory()->create(['company_id' => $company->id]);
+        $adminUser->roles()->attach($adminRole);
+
+        $memberUser = User::factory()->create(['company_id' => $company->id]);
+        $memberUser->roles()->attach($memberRole);
 
         Service::factory()->create([
             'company_id' => $company->id,
             'name' => 'Admin Only Service',
-            'required_role' => 'admin'
+            'required_role_id' => $adminRole->id
         ]);
 
         Service::factory()->create([
             'company_id' => $company->id,
             'name' => 'Public Service',
-            'required_role' => null
+            'required_role_id' => null
         ]);
 
         // Mock Filament Resource Query logic
         $this->actingAs($memberUser);
         $query = \App\Filament\Resources\Services\ServiceResource::getEloquentQuery();
         
-        // Use whereHas or scope to ensure we are looking at the right company if needed, 
-        // but here we just check the global query filter we implemented
         $servicesForMember = $query->get();
         
         $this->assertCount(1, $servicesForMember);
