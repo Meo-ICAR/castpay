@@ -51,9 +51,10 @@ class PriceResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $user = auth()->user();
-        if ($user && $user->hasRole("superadmin")) {
+        if ($user && $user->hasRole('superadmin')) {
             return parent::getEloquentQuery()->withoutGlobalScopes();
         }
+
         return parent::getEloquentQuery();
     }
 
@@ -68,6 +69,9 @@ class PriceResource extends Resource
             ])
             ->filters([
                 //
+            ])
+            ->actions([
+                \Filament\Actions\EditAction::make(),
             ]);
     }
 
