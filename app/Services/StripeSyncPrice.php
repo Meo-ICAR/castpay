@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\Company;
 use App\Models\Price;
-use App\Models\Service;
+use Illuminate\Support\Facades\Log;
+use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
 
 class StripeSyncPrice
@@ -16,54 +16,126 @@ class StripeSyncPrice
         $this->stripe = new StripeClient(config('cashier.secret'));
     }
 
-    public function syncCompanyToStripe(Company $company): void
+    /**
+     * Sync a single price to Stripe
+     *
+     * @param Price $price
+     * @param string $stripeProductId
+     * @return array
+     */
+    public function sync(Price $price, string $stripeProductId): array
     {
-        $services = $company->services()->with('prices')->get();
+        try {
+            // If price already exists in Stripe, archive it and create a new one
+            if ($price->stripe_price_id) {
+                return $this->updateExistingPrice($price, $stripeProductId);
+            }
 
-        foreach ($services as $service) {
-            $this->syncService($service);
+            // Create new price in Stripe
+            return $this->createNewPrice($price, $stripeProductId);
+        } catch (\Exception $e) {
+            Log::error('Failed to sync price to Stripe', [
+                'price_id' => $price->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Failed to sync price: ' . $e->getMessage(),
+                'price_id' => $price->id
+            ];
         }
     }
 
-    public function syncService(Service $service): void
+    /**
+     * Create a new price in Stripe
+     *
+     * @param Price $price
+     * @param string $stripeProductId
+     * @return array
+     * @throws \Stripe\Exception\ApiErrorException
+     */
+    protected function createNewPrice(Price $price, string $stripeProductId): array
     {
-        $params = [
-            'name' => $service->name,
-            'description' => $service->description,
-            'active' => (bool) $service->is_active,
+        $params = $this->buildPriceParams($price, $stripeProductId);
+        $stripePrice = $this->stripe->prices->create($params);
+
+        $price->update(['stripe_price_id' => $stripePrice->id]);
+
+        return [
+            'success' => true,
+            'message' => 'Price created successfully',
+            'stripe_price_id' => $stripePrice->id,
+            'price_id' => $price->id
         ];
-
-        if ($service->stripe_product_id) {
-            $stripeProduct = $this->stripe->products->update($service->stripe_product_id, $params);
-        } else {
-            $stripeProduct = $this->stripe->products->create($params);
-            $service->update(['stripe_product_id' => $stripeProduct->id]);
-        }
-
-        foreach ($service->prices as $price) {
-            $this->syncPrice($price, $stripeProduct->id);
-        }
     }
 
-    public function syncPrice(Price $price, string $stripeProductId): void
+    /**
+     * Update an existing price in Stripe by archiving the old one and creating a new one
+     *
+     * @param Price $price
+     * @param string $stripeProductId
+     * @return array
+     * @throws \Stripe\Exception\ApiErrorException
+     */
+    protected function updateExistingPrice(Price $price, string $stripeProductId): array
     {
-        if ($price->stripe_price_id) {
-            // Stripe prices are mostly immutable, we usually create a new one or toggle active status
-            // For simplicity, we only create if not exists or update active status if it was possible
-            return;
-        }
+        // Archive the old price in Stripe
+        $this->stripe->prices->update($price->stripe_price_id, [
+            'active' => false
+        ]);
 
+        // Create new price with updated data
+        return $this->createNewPrice($price, $stripeProductId);
+    }
+
+    /**
+     * Build the parameters array for Stripe price creation
+     *
+     * @param Price $price
+     * @param string $stripeProductId
+     * @return array
+     */
+    protected function buildPriceParams(Price $price, string $stripeProductId): array
+    {
         $params = [
             'product' => $stripeProductId,
-            'unit_amount' => $price->amount,
-            'currency' => $price->currency,
+            'unit_amount' => $price->amount * 100,  // Convert to cents
+            'currency' => strtolower($price->currency),
+            'metadata' => [
+                'price_id' => $price->id,
+                'created_at' => now()->toDateTimeString(),
+            ]
         ];
 
         if ($price->type === 'recurring') {
-            $params['recurring'] = ['interval' => $price->interval];
+            $params['recurring'] = [
+                'interval' => $price->interval,
+                'interval_count' => $price->interval_count ?? 1,
+            ];
         }
 
-        $stripePrice = $this->stripe->prices->create($params);
-        $price->update(['stripe_price_id' => $stripePrice->id]);
+        return $params;
+    }
+
+    /**
+     * Get price details from Stripe
+     *
+     * @param string $stripePriceId
+     * @return array|null
+     */
+    public function getStripePrice(string $stripePriceId): ?array
+    {
+        try {
+            $price = $this->stripe->prices->retrieve($stripePriceId);
+            return $price->toArray();
+        } catch (ApiErrorException $e) {
+            Log::error('Failed to retrieve price from Stripe', [
+                'stripe_price_id' => $stripePriceId,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
     }
 }
