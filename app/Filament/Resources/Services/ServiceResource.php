@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Services;
 
+use App\Filament\Resources\ServiceResource\RelationManagers\PricesRelationManager;
 use App\Filament\Resources\Services\Pages\ManageServices;
 use App\Models\Service;
 use App\Services\StripeSyncService;
@@ -122,6 +123,13 @@ class ServiceResource extends Resource
     {
         return [
             'index' => ManageServices::route('/'),
+        ];
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            PricesRelationManager::class,
         ];
     }
 }
