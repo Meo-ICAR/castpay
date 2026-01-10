@@ -22,6 +22,7 @@ class CastingItalianSeeder extends Seeder
         $actorRole = Role::where('slug', 'actor')->first();
         $workerRole = Role::where('slug', 'worker')->first();
         $bgRole = Role::where('slug', 'backgrounder')->first();
+        $customerRole = Role::where('slug', 'customer')->first();
 
         // 2. Creazione Compagnia di Casting
         $company = Company::firstOrCreate(
@@ -39,6 +40,17 @@ class CastingItalianSeeder extends Seeder
             ]
         );
         $admin->roles()->syncWithoutDetaching([$adminRole->id]);
+
+        // 3b. Utente Customer (per test)
+        $customerUser = User::firstOrCreate(
+            ['email' => 'customer@cinecitta.it'],
+            [
+                'name' => 'Cliente Test',
+                'password' => Hash::make('password'),
+                'company_id' => $company->id,
+            ]
+        );
+        $customerUser->roles()->syncWithoutDetaching([$customerRole->id]);
 
         // 4. Servizi e Listini Prezzi (In Italiano)
         $services = [
@@ -70,7 +82,7 @@ class CastingItalianSeeder extends Seeder
             [
                 'name' => 'Consulenza Immagine e Portfolio',
                 'description' => 'Servizio fotografico professionale e creazione book per casting.',
-                'required_role_id' => null, // Aperto a tutti
+                'required_role_id' => $customerRole->id, // Visibile ai customer
                 'prices' => [
                     ['name' => 'Servizio Completo', 'amount' => 15000, 'type' => 'one_time'],
                 ]

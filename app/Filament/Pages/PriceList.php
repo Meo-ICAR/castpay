@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\Company;
 use App\Models\Service;
 use App\Services\StripeSyncService;
 use Filament\Actions\Action;
@@ -25,10 +24,10 @@ class PriceList extends Page
             ->with(['prices', 'requiredRole'])
             ->where('is_active', true);
 
-        if ($user && !$user->hasRole('admin')) {
+        if ($user && ! $user->hasRole('admin')) {
             $query->where(function ($q) use ($user) {
                 $q->whereNull('required_role_id')
-                  ->orWhereIn('required_role_id', $user->roles->pluck('id'));
+                    ->orWhereIn('required_role_id', $user->roles->pluck('id'));
             });
         }
 
@@ -47,9 +46,14 @@ class PriceList extends Page
                         $syncService->syncCompanyToStripe(Filament::getTenant());
                         Notification::make()->title('Company Price List synced to Stripe!')->success()->send();
                     } catch (\Exception $e) {
-                        Notification::make()->title('Sync failed: ' . $e->getMessage())->danger()->send();
+                        Notification::make()->title('Sync failed: '.$e->getMessage())->danger()->send();
                     }
-                })
+                }),
         ];
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return ! auth()->user()?->hasRole('customer') ?? true;
     }
 }
